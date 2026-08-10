@@ -106,12 +106,25 @@ natuna/
 |-- database.py             # Skema & operasi basis data SQLite
 |-- natuna.md               # Dokumentasi tambahan proyek
 |
+|-- run_full_test.py        # Pengujian metrik performansi 5 skenario (F1, Recall, dll)
+|-- run_batch_test.py       # Pengujian keandalan memproses dataset besar (125k baris)
+|-- run_latency_test.py     # Pengukuran kecepatan pemrosesan per baris (ms)
+|-- run_sensitivity_test.py # Pengujian variasi batas/threshold deteksi anomali
+|-- generate_testing_dataset.py # Generator 5 dataset skenario dasar dan dataset 125k baris
+|-- verify_*.py             # Skrip utilitas verifikasi dataset dan deteksi
+|-- histogram_analysis.py   # Visualisasi distribusi data anomali
+|-- confusion_matrix.py     # Menghasilkan Confusion Matrix dari evaluasi sistem
+|
 |-- datasets/               # Dataset navigasi kapal (CSV)
-|   |-- normal_route.csv            # Data rute normal (baseline)
-|   |-- sudden_jump.csv             # Skenario lompatan posisi tiba-tiba
-|   |-- slow_drift.csv              # Skenario pergeseran arah bertahap
-|   |-- geofence_escape.csv         # Skenario keluar batas wilayah
-|   +-- mixed_attack_spoofing.csv   # Skenario serangan campuran
+|   |-- testing_dataset.csv         # Dataset utama pengujian performansi (125.001 baris)
+|   |-- full_test_summary.csv       # Ringkasan hasil evaluasi akurasi & performa
+|   |-- testing_summary.csv         # Ringkasan komputasi batch & pengujian beban
+|   +-- testing/                    # Data simulasi dasar (100 baris per file)
+|       |-- normal_route.csv        # Baseline tanpa anomali
+|       |-- sudden_jump.csv         # Skenario lompatan koordinat
+|       |-- slow_drift.csv          # Skenario pergeseran arah (drift)
+|       |-- geofence_escape.csv     # Skenario keluar batas Natuna
+|       +-- mixed_attack.csv        # Skenario multi-anomali campuran
 |
 |-- database/               # Penyimpanan basis data SQLite
 |   +-- natuna_spoofing.db          # File database utama
@@ -285,84 +298,51 @@ hierarchy = {'admin': 3, 'analyst': 2, 'user': 1}
 
 ---
 
+### 10. Pengujian & Evaluasi (Skrip `run_*.py` & Analitik)
+
+| Skrip | Fungsi |
+|-------|--------|
+| `run_full_test.py` | Mengevaluasi Precision, Recall, F1-Score dari 5 skenario (100 baris) |
+| `run_batch_test.py` | Menguji keandalan sistem dalam batch memproses `testing_dataset.csv` besar (125k baris) |
+| `run_latency_test.py` | Mengukur waktu komputasi (latensi) per baris untuk setiap algoritma deteksi |
+| `run_sensitivity_test.py` | Menguji ketahanan mesin deteksi saat memvariasikan ambang batas (threshold) |
+| `generate_testing_dataset.py` | Script untuk menggenerate 5 skenario simulasi dan 1 file raksasa secara dinamis |
+| `histogram_analysis.py` | Menampilkan dan menganalisa distribusi kecepatan & arah dalam dataset uji |
+| `confusion_matrix.py` | Menggambarkan secara visual hasil evaluasi model ke dalam grafik Confusion Matrix |
+
+---
+
 ## 📊 Dataset
 
 **Format kolom CSV (semua file):**
 ```
-timestamp,latitude,longitude,sog,cog
-2026-01-01 10:00:00,4.1234,108.1234,12.3,90.5
+timestamp,latitude,longitude,sog,cog,is_anomaly
+2026-01-01 10:00:00,4.1234,108.1234,12.3,90.5,0
 ```
 
 ---
 
-### 📁 `datasets/` — Data Simulasi Utama (5 file)
+### 📁 `datasets/testing/` — Data Simulasi Utama Dasar
 
-| File | Skenario | Titik | Keterangan |
+Kumpulan dataset ini di-generate melalui `generate_testing_dataset.py` (berukuran 100 baris per file), untuk mensimulasikan karakteristik unik berbagai tipe GPS Spoofing:
+
+| File | Skenario | Baris | Keterangan |
 |------|----------|:-----:|------------|
-| `normal_route.csv` | Rute normal | 100 | Baseline tanpa anomali |
-| `sudden_jump.csv` | Lompatan koordinat | 100 | Anomali pada step ke-50 |
-| `slow_drift.csv` | Pergeseran arah bertahap | 100 | Drift COG ab step ke-30 |
-| `geofence_escape.csv` | Keluar zona Natuna | 100 | Keluar batas ~step ke-20 |
-| `mixed_attack_spoofing.csv` | Serangan kombinasi | 100 | Multi-anomali |
+| `normal_route.csv` | Rute normal | 100 | Baseline tanpa anomali, pergerakan wajar |
+| `sudden_jump.csv` | Lompatan koordinat | 100 | Injeksi anomali pada step tertentu (lonjakan titik) |
+| `slow_drift.csv` | Pergeseran arah bertahap | 100 | Penyimpangan *course* (COG) bertahap dari rute asli |
+| `geofence_escape.csv` | Keluar zona Natuna | 100 | Memaksa posisi menembus batas wilayah operasi |
+| `mixed_attack.csv` | Serangan campuran | 100 | Multi-anomali yang digabungkan secara acak |
 
 ---
 
-### 📁 `datasets/testing/` — Data Pengujian Lengkap (20 file baru, 100 baris/file)
+### 📁 `datasets/` — Pengujian Skala Besar (Batch)
 
-20 dataset varian risiko baru melengkapi 5 file utama (sehingga total 25 dataset). Setiap skenario memiliki **4 varian baru** berdasarkan target Risk Score (25, 50, 75, 100).
-
-#### 🟢 Normal
-| File | Risk Focus | Flag Aktif |
-|------|:----------:|------------|
-| `normal_route.csv` | Mixed | (Base di direktori utama) |
-| `normal_r25.csv` | **25** | Speed (kecil) |
-| `normal_r50.csv` | **50** | Speed + Course |
-| `normal_r75.csv` | **75** | Speed + Course + Geofence |
-| `normal_r100.csv` | **100** | Semua 4 flag |
-
-#### ⚡ Sudden Jump
-| File | Risk Focus | Flag Aktif |
-|------|:----------:|------------|
-| `sudden_jump.csv` | Mixed | (Base di direktori utama) |
-| `sudden_jump_r25.csv` | **25** | Speed (loncatan posisi) |
-| `sudden_jump_r50.csv` | **50** | Speed + Course |
-| `sudden_jump_r75.csv` | **75** | Speed + Course + Geofence |
-| `sudden_jump_r100.csv` | **100** | Semua 4 flag |
-
-#### 🔄 Slow Drift
-| File | Risk Focus | Flag Aktif |
-|------|:----------:|------------|
-| `slow_drift.csv` | Mixed | (Base di direktori utama) |
-| `slow_drift_r25.csv` | **25** | Course (drift bertahap) |
-| `slow_drift_r50.csv` | **50** | Course + Border |
-| `slow_drift_r75.csv` | **75** | Speed + Course + Geofence |
-| `slow_drift_r100.csv` | **100** | Semua 4 flag |
-
-#### 🚧 Geofence Escape
-| File | Risk Focus | Flag Aktif |
-|------|:----------:|------------|
-| `geofence_escape.csv` | Mixed | (Base di direktori utama) |
-| `geofence_escape_r25.csv` | **25** | Geofence only |
-| `geofence_escape_r50.csv` | **50** | Geofence + Border |
-| `geofence_escape_r75.csv` | **75** | Speed + Geofence + Border |
-| `geofence_escape_r100.csv` | **100** | Semua 4 flag |
-
-#### 🌐 Mixed Attack
-| File | Risk Focus | Flag Aktif |
-|------|:----------:|------------|
-| `mixed_attack_spoofing.csv` | Mixed | (Base di direktori utama) |
-| `mixed_attack_r25.csv` | **25** | Speed only |
-| `mixed_attack_r50.csv` | **50** | Speed + Course |
-| `mixed_attack_r75.csv` | **75** | Speed + Course + Geofence |
-| `mixed_attack_r100.csv` | **100** | Semua 4 flag |
-
-**Ringkasan `datasets/testing/`:**
-
-| Statistik | Nilai |
-|-----------|-------|
-| Total file tambahan | **20 file** (Total Keseluruhan = 25 dataset) |
-| Baris per file | **100 baris** |
-| Total baris (baru) | **2.000 baris** |
+| File | Baris | Ukuran | Fungsi / Keterangan |
+|------|-------|--------|---------------------|
+| `testing_dataset.csv` | **125.001** | ~8.5 MB | Dataset skala besar (berdurasi berbulan-bulan) untuk melakukan pengujian *Stress Test* (konsumsi RAM, latensi) melalui script `run_batch_test.py` |
+| `full_test_summary.csv` | 6 | - | Menyimpan hasil metrik F1 Score, dll dari `run_full_test.py` |
+| `testing_summary.csv` | - | - | Ringkasan durasi total dan max risk score dari batch testing |
 
 ---
 
