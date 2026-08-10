@@ -1,0 +1,6 @@
+No,Skenario,Varian,Nama Dataset,Total Baris,Speed Alert,Course Alert,Geofence Alert,Border Alert,Avg Risk Score,Max Risk Score,Dominant Level,Spoofing Count,Spoofing (%),Precision,Recall,F1 Score
+1,Normal,Base,normal_route.csv,100,0,0,0,0,0.0,0,NORMAL,0,0.0,0.0,0.0,0.0
+2,Sudden Jump,Base,sudden_jump.csv,100,8,0,0,0,2.0,25,NORMAL,0,0.0,0.0,0.0,0.0
+3,Slow Drift,Base,slow_drift.csv,100,0,0,0,0,0.0,0,NORMAL,0,0.0,0.0,0.0,0.0
+4,Geofence Escape,Base,geofence_escape.csv,100,6,0,59,0,16.25,50,NORMAL,3,3.0,1.0,0.048,0.092
+5,Mixed Attack,Base,mixed_attack.csv,100,2,0,25,0,6.75,50,NORMAL,1,1.0,1.0,0.038,0.074

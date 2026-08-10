@@ -1,0 +1,6 @@
+Filename,Total_Rows,Speed_Alerts,Course_Alerts,Geofence_Alerts,Border_Alerts,Avg_Risk_Score,Max_Risk_Score,Dominant_Level,Spoofing_Count,Spoofing_Pct,TP,FP,TN,FN
+geofence_escape.csv,100,6,0,59,0,16.25,50,NORMAL,3,3.0,3,0,38,59
+mixed_attack.csv,100,2,0,25,0,6.75,50,NORMAL,1,1.0,1,0,74,25
+normal_route.csv,100,0,0,0,0,0.0,0,NORMAL,0,0.0,0,0,100,0
+slow_drift.csv,100,0,0,0,0,0.0,0,NORMAL,0,0.0,0,0,41,59
+sudden_jump.csv,100,8,0,0,0,2.0,25,NORMAL,0,0.0,0,0,77,23
