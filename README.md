@@ -298,21 +298,25 @@ hierarchy = {'admin': 3, 'analyst': 2, 'user': 1}
 
 ---
 
-### 10. Pengujian & Evaluasi (Skrip `run_*.py` & Analitik)
+### 10. Pengujian & Evaluasi (Sesuai Metodologi Paper)
 
-| Skrip | Fungsi |
-|-------|--------|
-| `run_full_test.py` | Mengevaluasi Precision, Recall, F1-Score dari 5 skenario (100 baris) |
-| `run_batch_test.py` | Menguji keandalan sistem dalam batch memproses `testing_dataset.csv` besar (125k baris) |
-| `run_latency_test.py` | Mengukur waktu komputasi (latensi) per baris untuk setiap algoritma deteksi |
-| `run_sensitivity_test.py` | Menguji ketahanan mesin deteksi saat memvariasikan ambang batas (threshold) |
-| `generate_testing_dataset.py` | Script untuk menggenerate 5 skenario simulasi dan 1 file raksasa secara dinamis |
-| `histogram_analysis.py` | Menampilkan dan menganalisa distribusi kecepatan & arah dalam dataset uji |
-| `confusion_matrix.py` | Menggambarkan secara visual hasil evaluasi model ke dalam grafik Confusion Matrix |
+Sistem dilengkapi dengan sekumpulan skrip pengujian untuk memvalidasi performa deteksi dan kelayakan komputasi waktu nyata (real-time feasibility) berdasarkan metrik yang tertuang pada paper:
+
+| Skrip | Fungsi & Metrik Evaluasi |
+|-------|--------------------------|
+| `run_full_test.py` | Mengukur **Akurasi Deteksi** (Precision, Recall, F1-Score) pada 5 skenario serangan (total 500 baris). Sesuai paper, menguji pertukaran antara Precision 1,000 dan Recall 0,354. |
+| `run_latency_test.py` | Mengukur **Kelayakan Waktu Nyata** (Latency & Throughput) menggunakan 10.000 baris data simulasi. Membuktikan throughput ~67.364 baris/detik. |
+| `run_sensitivity_test.py` | Mengukur **Ketahanan Pembobotan** (Robustness) terhadap variasi konfigurasi bobot (seperti fokus batas, kecepatan) dan efeknya pada F1-Score. |
+| `run_batch_test.py` | Menguji keandalan sistem (Stress-test lanjutan) dalam memproses `testing_dataset.csv` berskala besar (125.001 baris). |
+| `generate_testing_dataset.py`| Generator dataset sintetik terinjeksi anomali untuk 5 skenario dasar dan file stress-test raksasa. |
+| `confusion_matrix.py` | Menghasilkan grafik visual *Confusion Matrix* dari pengujian akurasi deteksi. |
+| `histogram_analysis.py` | Visualisasi distribusi kecepatan (SOG) dan arah (COG) pada dataset. |
 
 ---
 
-## 📊 Dataset
+## 📊 Dataset Evaluasi
+
+Pengujian dalam paper bertumpu pada dataset sintetik berformat NMEA-0183 (`$GPRMC`) yang diekstrak menjadi tabel CSV. Dataset terbagi untuk pengujian akurasi dan uji beban (stress-test).
 
 **Format kolom CSV (semua file):**
 ```
@@ -322,27 +326,28 @@ timestamp,latitude,longitude,sog,cog,is_anomaly
 
 ---
 
-### 📁 `datasets/testing/` — Data Simulasi Utama Dasar
+### 📁 `datasets/testing/` — Data Akurasi (500 Baris)
 
-Kumpulan dataset ini di-generate melalui `generate_testing_dataset.py` (berukuran 100 baris per file), untuk mensimulasikan karakteristik unik berbagai tipe GPS Spoofing:
+Sesuai paper, evaluasi metrik klasifikasi menggunakan 5 skenario dasar berukuran masing-masing 100 baris:
 
-| File | Skenario | Baris | Keterangan |
-|------|----------|:-----:|------------|
-| `normal_route.csv` | Rute normal | 100 | Baseline tanpa anomali, pergerakan wajar |
-| `sudden_jump.csv` | Lompatan koordinat | 100 | Injeksi anomali pada step tertentu (lonjakan titik) |
-| `slow_drift.csv` | Pergeseran arah bertahap | 100 | Penyimpangan *course* (COG) bertahap dari rute asli |
-| `geofence_escape.csv` | Keluar zona Natuna | 100 | Memaksa posisi menembus batas wilayah operasi |
-| `mixed_attack.csv` | Serangan campuran | 100 | Multi-anomali yang digabungkan secara acak |
+| File | Skenario | Injeksi Anomali | Deteksi Dominan |
+|------|----------|-----------------|-----------------|
+| `normal_route.csv` | Rute Normal | Tidak ada (Baseline) | Tidak terdeteksi |
+| `sudden_jump.csv` | Lompatan Koordinat | Titik ke-50 (Lompatan jauh) | Speed & Border Alert |
+| `slow_drift.csv` | Pergeseran Arah | Bertahap sejak titik ke-31 | *Lolos (False Negative)* |
+| `geofence_escape.csv`| Keluar Zona Natuna | 79 titik di luar operasi | *Lolos (False Negative)* |
+| `mixed_attack.csv` | Serangan Campuran | Acak & Multi-vektor | Seluruh 4 indikator |
 
 ---
 
-### 📁 `datasets/` — Pengujian Skala Besar (Batch)
+### 📁 `datasets/` — Data Stress-Test & Kelayakan (Batch)
 
-| File | Baris | Ukuran | Fungsi / Keterangan |
-|------|-------|--------|---------------------|
-| `testing_dataset.csv` | **125.001** | ~8.5 MB | Dataset skala besar (berdurasi berbulan-bulan) untuk melakukan pengujian *Stress Test* (konsumsi RAM, latensi) melalui script `run_batch_test.py` |
-| `full_test_summary.csv` | 6 | - | Menyimpan hasil metrik F1 Score, dll dari `run_full_test.py` |
-| `testing_summary.csv` | - | - | Ringkasan durasi total dan max risk score dari batch testing |
+| File / Kondisi | Baris | Fungsi Pengujian |
+|----------------|-------|------------------|
+| Duplikasi Memory | 10.000 | Mengukur *latency* & *throughput* pada `run_latency_test.py` (sebagaimana dipaparkan pada paper). |
+| `testing_dataset.csv` | 125.001 | *Extended stress-test* pada `run_batch_test.py` untuk menguji memori dan stabilitas sistem secara masif. |
+| `full_test_summary.csv` | 6 | Ringkasan metrik akurasi (Precision, Recall, F1) dari `run_full_test.py`. |
+| `testing_summary.csv` | - | Log komputasi dan metrik dari `run_batch_test.py`. |
 
 ---
 
